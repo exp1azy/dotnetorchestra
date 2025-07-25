@@ -1,0 +1,26 @@
+﻿<div class="error-notification @(IsVisible ? "show" : "")">
+    <div class="notification-content">
+        <SvgIcon Width="20" Height="20" Name="error_icon" />
+        <span>@Message</span>
+        <button class="notification-close" @onclick="Hide">
+            <SvgIcon Width="16" Height="16" Name="close_icon" />
+        </button>
+    </div>
+</div>
+
+@code {
+    private string? Message { get; set; }
+    private bool IsVisible => !string.IsNullOrEmpty(Message);
+
+    public void Show(string message)
+    {
+        Message = message;
+        StateHasChanged();
+    }
+
+    private void Hide()
+    {
+        Message = null;
+        StateHasChanged();
+    }
+}

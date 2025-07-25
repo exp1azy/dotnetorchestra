@@ -1,0 +1,30 @@
+﻿<div class="notification @NotificationType @(IsVisible ? "show" : "")">
+    <div class="notification-content">
+        <SvgIcon Width="20" Height="20" Name="notification" />
+        <span>@Message</span>
+        <button class="notification-close" @onclick="Hide">
+            <SvgIcon Width="16" Height="16" Name="close_icon" />
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string NotificationType { get; set; } = string.Empty;
+
+    private string? Message;
+    private bool IsVisible;
+
+    public void Show(string message)
+    {
+        Message = message;
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    public void Hide()
+    {
+        Message = null;
+        IsVisible = false;
+        StateHasChanged();
+    }
+}

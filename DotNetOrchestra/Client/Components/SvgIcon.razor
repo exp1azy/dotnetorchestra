@@ -1,0 +1,50 @@
+﻿@using System.Text.RegularExpressions
+@inject IJSRuntime JS
+
+@{
+    RenderFragment renderFragment = builder => builder.AddContent(0, new MarkupString(_markup ?? string.Empty));
+    @renderFragment
+}
+
+@code {
+    [Parameter] public string? ViewBox { get; set; }
+    [Parameter] public string? Stroke { get; set; }
+    [Parameter] public string? Fill { get; set; }
+    [Parameter] public string? Height { get; set; }
+    [Parameter] public string? Width { get; set; }
+    [Parameter] public string? StrokeWidth { get; set; }
+    [Parameter] public string? ClassName { get; set; }
+    [Parameter][EditorRequired] public string? Name { get; set; }
+
+    private string? _markup;
+    private static readonly Regex _regexSvgContent = new(@"(?<=<\s*[sS][vV][gG].*>)[\s\S]*(?=<\s*/\s*[sS][vV][gG]\s*>)");
+    private static readonly Regex _regexViewBox = new(@"(?<=\s+viewBox\s*=\s*"")[\s\S]*?(?="")");
+
+    private string ViewBoxMarkup(string defaultValue) => $" viewBox=\"{(ViewBox == null ? defaultValue : ViewBox)}\"";
+    private string StrokeMarkup => Stroke != null ? $" stroke=\"{Stroke}\"" : string.Empty;
+    private string FillMarkup => Fill != null ? $" fill=\"{Fill}\"" : string.Empty;
+    private string HeightMarkup => Height != null ? $" height=\"{Height}\"" : string.Empty;
+    private string WidthMarkup => Width != null ? $" width=\"{Width}\"" : string.Empty;
+    private string StrokeWidthMarkup => StrokeWidth != null ? $" stroke-width=\"{StrokeWidth}\"" : string.Empty;
+    private string ClassNameMarkup => ClassName != null ? $" class=\"{ClassName}\"" : string.Empty;
+
+    private string? _lastName;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+            throw new ApplicationException(".svg icon name is required.");
+
+        if (_lastName != Name)
+        {
+            var raw = await JS.InvokeAsync<string>("getSvg", Name);
+
+            var matchContent = _regexSvgContent.Match(raw);
+            var matchViewBox = _regexViewBox.Match(raw);
+
+            _markup = $"<svg{ClassNameMarkup}{ViewBoxMarkup(matchViewBox.Value)}{StrokeMarkup}{FillMarkup}{HeightMarkup}{WidthMarkup}{StrokeWidthMarkup} xmlns=\"http://www.w3.org/2000/svg\">{matchContent.Value.Trim()}</svg>";
+
+            _lastName = Name;
+        }
+    }
+}

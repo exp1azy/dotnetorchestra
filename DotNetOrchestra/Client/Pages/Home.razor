@@ -1,0 +1,289 @@
+﻿@using System.Drawing
+
+@inject ApiService Api
+@inject LoadingService Load
+
+@page "/"
+
+<PageTitle>Оркестратор приложений</PageTitle>
+
+<Modal @ref="addModal" ConfirmText="Добавить" OnClose="OnAddClose" Title="Добавить приложение">
+    <EditForm Model="@NoteToCreate">
+        <div class="form-group">
+            <label>Название</label>
+            <InputText @bind-Value="NoteToCreate.Name" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Версия приложения</label>
+            <InputText @bind-Value="NoteToCreate.Version" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Описание</label>
+            <InputText @bind-Value="NoteToCreate.Description" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Выберите архив приложения</label>
+            <InputFile OnChange="OnFileChange" accept=".zip" class="form-control" />
+        </div>
+    </EditForm>
+</Modal>
+
+<Modal @ref="editModal" ConfirmText="Изменить" OnClose="OnEditClose" Title="Обновить информацию о приложении">
+    <EditForm Model="@NoteToCreate">
+        <div class="form-group">
+            <label>Название</label>
+            <InputText @bind-Value="NoteToEdit.Name" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Версия приложения</label>
+            <InputText @bind-Value="NoteToEdit.Version" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Описание</label>
+            <InputText @bind-Value="NoteToEdit.Description" class="form-control" />
+        </div>
+    </EditForm>
+</Modal>
+
+<Modal @ref="deleteModal" ConfirmText="Удалить" OnClose="OnDeleteClose" Title="Удалить приложение">
+    <p>Вы действительно хотите удалить приложение <b>@NoteToDelete?.Name</b>?</p>
+</Modal>
+
+<div>
+    <header class="app-header">
+        <div class="header-buttons">
+            <div @onclick="OnAddClick" title="Добавить приложение" class="svg-btn">
+                <SvgIcon Name="add_note" Width="26" Height="26" />
+            </div>
+            <div @onclick="OnReloadClick" title="Обновить информацию о приложениях" class="svg-btn">
+                <SvgIcon Name="reload" Width="26" Height="26" />
+            </div>
+        </div>
+    </header>
+
+    <div class="note-network">
+        @foreach (var note in Notes)
+        {
+            <Note InitialX="@note.X"
+                InitialY="@note.Y"
+                Width="250"
+                Height="150"
+                Title="@note.Name"
+                Version="@note.Version"
+                Description="@note.Description"
+                SdkType="@note.AppSdkType"
+                OnPositionChanged="point => UpdateNotePosition(note, point)"
+                OnEditRequested="() => OnEditClick(note)"
+                OnDeleteRequested="() => OnDeleteClick(note)"
+                OnRunChanged="isRunning => ToggleRun(note, isRunning)">
+            </Note>
+        }
+    </div>
+
+    <Notification @ref="notification" NotificationType="@notificationType" />
+</div>
+
+@code {
+    private Modal addModal;
+    private Modal editModal;
+    private Modal deleteModal;
+    private Notification notification;
+
+    private NoteModel NoteToCreate = new();
+    private NoteViewModel NoteToEdit = new();
+    private NoteViewModel? NoteToDelete;
+    private string notificationType = string.Empty;
+
+    private List<NoteViewModel> Notes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotesAsync();
+    }
+
+    private void SetNotes(List<NoteModel> notes)
+    {
+        if (notes == null || notes.Count == 0)
+            return;
+
+        int xOffset = 100;
+        int yOffset = 100;
+
+        for (int i = 0; i < notes.Count; i++)
+        {
+            var newNote = new NoteViewModel
+            {
+                Id = notes[i].Id,
+                Name = notes[i].Name,
+                Version = notes[i].Version,
+                Description = notes[i].Description,
+                AppSdkType = notes[i].AppSdkType,
+                X = xOffset,
+                Y = yOffset
+            };
+
+            Notes.Add(newNote);
+
+            xOffset += 300;
+            yOffset += 200;
+        }
+    }
+
+    private void UpdateNotePosition(NoteViewModel note, Point point)
+    {
+        note.X = point.X;
+        note.Y = point.Y;
+        StateHasChanged();
+    }
+
+    private void ToggleRun(NoteViewModel note, bool running)
+    {
+
+    }
+
+    private void OnAddClick()
+    {
+        addModal.Show();
+    }
+
+    private void OnEditClick(NoteViewModel note)
+    {
+        NoteToEdit = note;
+        editModal.Show();
+    }
+
+    private void OnDeleteClick(NoteViewModel note)
+    {
+        NoteToDelete = note;
+        deleteModal.Show();
+    }
+
+    private async Task OnReloadClick()
+    {
+        Notes.Clear();
+        await LoadNotesAsync();
+    }
+
+    private async Task OnAddClose(bool confirmed)
+    {
+        if (!confirmed)
+            return;
+
+        try
+        {
+            Load.Show();
+
+            var createdNote = await Api.CreateNoteAsync(NoteToCreate);
+
+            Notes.Add(new NoteViewModel
+            {
+                Id = createdNote.Id,
+                Name = createdNote.Name,
+                Version = createdNote.Version,
+                X = 100,
+                Y = 100
+            });
+
+            ShowSuccess($"Приложение {createdNote.Name} успешно добавлено");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            Load.Hide();
+        }
+    }
+
+    private async Task OnEditClose(bool confirmed)
+    {
+        if (!confirmed)
+            return;
+
+        try
+        {
+            Load.Show();
+
+            await Api.UpdateNoteAsync(new NoteModel
+            {
+                Id = NoteToEdit!.Id,
+                Name = NoteToEdit.Name,
+                Version = NoteToEdit.Version,
+                Description = NoteToEdit.Description
+            });
+
+            ShowSuccess($"Информация о приложении {NoteToEdit.Name} успешно обновлена");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            Load.Hide();
+        }
+    }
+
+    private async Task OnDeleteClose(bool confirmed)
+    {
+        if (!confirmed)
+            return;
+
+        try
+        {
+            Load.Show();
+
+            await Api.RemoveNoteAsync(NoteToDelete!.Id);
+            Notes.Remove(NoteToDelete);
+
+            ShowSuccess($"Приложение {NoteToDelete.Name} успешно удалено");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            Load.Hide();
+        }
+    }
+
+    private async Task OnFileChange(InputFileChangeEventArgs e)
+    {
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        NoteToCreate.AppData = ms.ToArray();
+    }
+
+    private async Task LoadNotesAsync()
+    {
+        try
+        {
+            Load.Show();
+            var notes = await Api.GetNotesAsync();
+            SetNotes(notes);
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            Load.Hide();
+        }
+    }
+
+    private void ShowSuccess(string successMessage)
+    {
+        notificationType = "success";
+        notification.Show(successMessage);
+    }
+
+    private void ShowError(string errorMessage)
+    {
+        notificationType = "error";
+        notification.Show(errorMessage);
+    }
+}

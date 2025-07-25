@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>DotNetOrchestra</title>
+    <base href="/" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="css/note.css" rel="stylesheet" />
+    <link href="css/modal.css" rel="stylesheet" />
+    <link href="css/notification.css" rel="stylesheet" />
+    <link href="css/loading_overlay.css" rel="stylesheet" />
+    <link href="manifest.json" rel="manifest" />
+    <script src="js/app.js"></script>
+</head>
+
+<body>
+    <div id="app">Загрузка...</div>
+
+    <div id="blazor-error-ui">
+        Произошла неизвестная ошибка.
+        <a href="" class="reload">Обновить</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js');</script>
+</body>
+
+</html>

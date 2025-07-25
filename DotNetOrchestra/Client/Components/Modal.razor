@@ -1,0 +1,43 @@
+﻿<div class="modal-overlay @(IsVisible ? "visible" : "")" @onclick="Close">
+    <div class="modal-content" @onclick:stopPropagation>
+        <div class="modal-header">
+            <h3>@Title</h3>
+            <button class="modal-close" @onclick="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            @ChildContent
+        </div>
+        <div class="modal-footer">
+            @if (ShowCancel)
+            {
+                <button class="btn-cancel" @onclick="Close">Отмена</button>
+            }
+            <button class="btn-confirm" @onclick="Confirm">@ConfirmText</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; }
+    [Parameter] public string ConfirmText { get; set; }
+    [Parameter] public bool ShowCancel { get; set; } = true;
+    [Parameter] public RenderFragment ChildContent { get; set; }
+    [Parameter] public EventCallback<bool> OnClose { get; set; }
+
+    public bool IsVisible { get; private set; }
+
+    public void Show() => IsVisible = true;
+    public void Hide() => IsVisible = false;
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await OnClose.InvokeAsync(false);
+    }
+
+    private async Task Confirm()
+    {
+        IsVisible = false;
+        await OnClose.InvokeAsync(true);
+    }
+}

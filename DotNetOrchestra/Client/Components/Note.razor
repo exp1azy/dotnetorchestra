@@ -1,0 +1,150 @@
+﻿@using System.Drawing
+@inject IJSRuntime JS
+
+<div @ref="noteRef"
+     class="note"
+     style="left:@X.ToString("F0")px;
+            top:@Y.ToString("F0")px;
+            width:@Width.ToString("F0")px;
+            height:@Height.ToString("F0")px;
+            z-index:@ZIndex;"
+     @onmousedown="OnMouseDown"
+     @onmouseup="OnMouseUp">
+
+    <div class="note-controls">
+        <div @onclick="ToggleRun" title="Запустить / Остановить" class="svg-btn">
+            <SvgIcon Name="@(_isRunning ? "stopb" : "start")" Width="18" Height="18" />
+        </div>
+        <div @onclick="OnEdit" title="Редактировать" class="svg-btn">
+            <SvgIcon Name="edit" Width="18" Height="18" />
+        </div>
+        <div @onclick="OnSettings" title="Изменить настройки" class="svg-btn">
+            <SvgIcon Name="settings" Width="18" Height="18" />
+        </div>
+        <div @onclick="OnDelete" title="Удалить" class="svg-btn">
+            <SvgIcon Name="remove" Width="18" Height="18" />
+        </div>
+    </div>
+
+    <div class="note-content">
+        <div class="note-title">
+            <SvgIcon Name="@SdkTypeIcon" Width="16" Height="16" ClassName="sdk-icon" />
+            <span>@Title</span>
+        </div>
+        <div class="note-version">@Version</div>
+        <div class="note-text">@(string.IsNullOrEmpty(Description) ? "Нет описания" : Description)</div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public double InitialX { get; set; }
+    [Parameter] public double InitialY { get; set; }
+    [Parameter] public double Width { get; set; } = 200;
+    [Parameter] public double Height { get; set; } = 120;
+
+    [Parameter] public string Title { get; set; } = "Без названия";
+    [Parameter] public string Version { get; set; } = "1.0.0";
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public int SdkType { get; set; }
+
+    [Parameter] public EventCallback<Point> OnPositionChanged { get; set; }
+    [Parameter] public EventCallback OnDeleteRequested { get; set; }
+    [Parameter] public EventCallback OnEditRequested { get; set; }
+    [Parameter] public EventCallback OnSettingsRequested { get; set; }
+    [Parameter] public EventCallback<bool> OnRunChanged { get; set; }
+
+    private double X;
+    private double Y;
+    private int ZIndex = 1;
+    private static int globalZIndex = 1;
+
+    private ElementReference noteRef;
+    private bool isDragging = false;
+    private double offsetX;
+    private double offsetY;
+    private DotNetObjectReference<Note>? dotNetRef;
+
+    private bool _isRunning = false;
+
+    protected override void OnInitialized()
+    {
+        X = InitialX;
+        Y = InitialY;
+    }
+
+    private async Task OnMouseDown(MouseEventArgs e)
+    {
+        isDragging = true;
+        globalZIndex++;
+        ZIndex = globalZIndex;
+
+        offsetX = e.ClientX - X;
+        offsetY = e.ClientY - Y;
+
+        dotNetRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("noteDragHelper.attachListeners", dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task OnMouseMove(double clientX, double clientY)
+    {
+        if (!isDragging) return;
+
+        var windowSize = await JS.InvokeAsync<WindowSize>("noteDragHelper.getWindowSize");
+
+        var newX = clientX - offsetX;
+        var newY = clientY - offsetY;
+
+        X = Math.Max(0, Math.Min(newX, windowSize.Width - Width));
+        Y = Math.Max(0, Math.Min(newY, windowSize.Height - Height));
+
+        await OnPositionChanged.InvokeAsync(new Point((int)X, (int)Y));
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnMouseUp()
+    {
+        isDragging = false;
+        await JS.InvokeVoidAsync("noteDragHelper.detachListeners");
+        dotNetRef?.Dispose();
+    }
+
+    private async Task ToggleRun()
+    {
+        await OnRunChanged.InvokeAsync(_isRunning);
+        _isRunning = !_isRunning;
+    }
+
+    private async Task OnEdit()
+    {
+        await OnEditRequested.InvokeAsync();
+    }
+
+    private async Task OnSettings()
+    {
+        await OnSettingsRequested.InvokeAsync();
+    }
+
+    private async Task OnDelete()
+    {
+        await OnDeleteRequested.InvokeAsync();
+    }
+
+    private string SdkTypeIcon => SdkType switch
+    {
+        0 => "terminal",
+        1 => "web",
+        2 => "desktop",
+        3 => "worker",
+        4 => "blazor",
+        5 => "razor",
+        _ => "terminal"
+    };
+
+    private struct WindowSize
+    {
+        public int Width { get; set; }
+        public int Height { get; set; }
+    }
+}
